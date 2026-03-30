@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Volume2, CheckCircle2, XCircle, Undo2, Mic, MicOff, Star } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Volume2, CheckCircle2, XCircle, Undo2, Mic, MicOff, Star, Loader2 } from 'lucide-react';
 import { Task } from '@/lib/syllabus';
-import { speak, stop } from '@/lib/speechEngine';
+import { useSpeech } from '@/hooks/useSpeech';
+import { speakFeedback } from '@/lib/speechEngine';
 
 interface Props {
   task: Task;
@@ -28,22 +29,21 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
   const [isCorrect, setIsCorrect] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [speakingDone, setSpeakingDone] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [inputText, setInputText] = useState('');
   const [showUndo, setShowUndo] = useState(false);
 
+  // Each card has its own speech hook so state is isolated per card
+  const { isPlaying, toggle, play, pause } = useSpeech();
+  const recordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Audio playback ────────────────────────────────────────────────────────
+
   const handlePlayAudio = () => {
-    if (isPlaying) {
-      stop();
-      setIsPlaying(false);
-      return;
-    }
-    const textToSpeak = task.audioText ?? task.content;
-    setIsPlaying(true);
-    speak(textToSpeak, {
-      onEnd: () => setIsPlaying(false),
-    });
+    const text = task.audioText ?? task.content;
+    toggle(text);
   };
+
+  // ── MCQ ───────────────────────────────────────────────────────────────────
 
   const handleSubmitMCQ = () => {
     if (!selected || submitted) return;
@@ -52,46 +52,78 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
     setSubmitted(true);
     setShowUndo(true);
     onComplete(task.id, task.xp, correct);
+
+    // Speak the correct answer back so learner hears it
+    const feedback = correct
+      ? `Correct! The answer is: ${task.correctAnswer}.`
+      : `Not quite. The correct answer is: ${task.correctAnswer}.`;
+    // Short delay so the visual feedback appears first
+    setTimeout(() => play(feedback), 400);
   };
 
-  const handleSpeakingSubmit = () => {
-    setSpeakingDone(true);
-    setShowUndo(true);
-    onComplete(task.id, task.xp, true);
-  };
-
-  const handleStartRecording = () => {
-    if (isRecording) {
-      setIsRecording(false);
-      return;
-    }
-    // Speak the prompt back using TTS for demo
-    if (task.speakingPrompt) {
-      speak(task.speakingPrompt, {
-        onEnd: () => setIsRecording(false),
-      });
-    }
-    setIsRecording(true);
-    setTimeout(() => setIsRecording(false), 8000);
-  };
+  // ── Fill-blank ────────────────────────────────────────────────────────────
 
   const handleFillBlankSubmit = () => {
     if (!inputText.trim() || submitted) return;
-    const correct = inputText.toLowerCase().includes(task.correctAnswer?.toLowerCase() ?? '');
+    const correct = inputText.toLowerCase().trim() === (task.correctAnswer?.toLowerCase().trim() ?? '');
     setIsCorrect(correct);
     setSubmitted(true);
     setShowUndo(true);
     onComplete(task.id, task.xp, correct);
+
+    const feedback = correct
+      ? `Correct! The answer is: ${task.correctAnswer}.`
+      : `Not quite. The correct answer is: ${task.correctAnswer}.`;
+    setTimeout(() => play(feedback), 400);
   };
 
+  // ── Speaking ──────────────────────────────────────────────────────────────
+
+  const handleStartRecording = () => {
+    if (isRecording) {
+      // User stops recording manually
+      if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
+      setIsRecording(false);
+      return;
+    }
+
+    // First: speak the prompt so they know what to say
+    const promptText = task.audioText ?? task.content;
+    play(promptText, () => {
+      // After the prompt finishes, start the "recording" window
+      setIsRecording(true);
+      recordTimerRef.current = setTimeout(() => {
+        setIsRecording(false);
+      }, 10_000); // 10s recording window
+    });
+  };
+
+  const handleSpeakingSubmit = () => {
+    pause(); // stop any ongoing playback
+    if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
+    setIsRecording(false);
+    setSpeakingDone(true);
+    setShowUndo(true);
+    onComplete(task.id, task.xp, true);
+    // Give spoken positive feedback
+    setTimeout(speakFeedback, 300);
+  };
+
+  // ── Undo ──────────────────────────────────────────────────────────────────
+
   const handleUndo = () => {
+    pause();
+    if (recordTimerRef.current) clearTimeout(recordTimerRef.current);
     setSubmitted(false);
     setSelected(null);
     setInputText('');
     setSpeakingDone(false);
+    setIsRecording(false);
     setShowUndo(false);
     onUndo(task.id);
   };
+
+  // ── Collapsed view (previously completed, not yet interacted) ─────────────
 
   if (completed && !submitted && !speakingDone) {
     return (
@@ -105,12 +137,29 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
     );
   }
 
-  return (
-    <div
-      className="task-card"
-      data-testid={`task-card-${task.id}`}
+  // ── Audio button shared between Listening & Speaking ──────────────────────
+
+  const AudioButton = ({ label }: { label: string }) => (
+    <button
+      onClick={handlePlayAudio}
+      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all w-fit ${
+        isPlaying
+          ? 'bg-primary text-primary-foreground pulse-speaking'
+          : 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20'
+      }`}
+      data-testid={`button-play-audio-${task.id}`}
+      aria-label={isPlaying ? 'Stop audio' : label}
     >
-      {/* Header */}
+      {isPlaying
+        ? <><Loader2 size={14} className="animate-spin" /> Stop</>
+        : <><Volume2 size={14} /> {label}</>
+      }
+    </button>
+  );
+
+  return (
+    <div className="task-card" data-testid={`task-card-${task.id}`}>
+      {/* ── Header ── */}
       <div className="flex items-center gap-2 mb-3">
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${TYPE_COLORS[task.type]}`}>
           {task.type}
@@ -124,37 +173,28 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
         </div>
       </div>
 
-      {/* Instruction */}
+      {/* ── Instruction ── */}
       <p className="text-sm text-muted-foreground mb-2">{task.instruction}</p>
 
-      {/* Content */}
+      {/* ── Content ── */}
       <p className="text-base font-semibold text-foreground mb-4 leading-relaxed">{task.content}</p>
 
-      {/* Listening audio */}
-      {task.audioText && task.type === 'listening' && (
-        <button
-          onClick={handlePlayAudio}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full mb-4 text-sm font-medium transition-all ${
-            isPlaying
-              ? 'bg-primary text-primary-foreground pulse-speaking'
-              : 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20'
-          }`}
-          data-testid={`button-play-audio-${task.id}`}
-        >
-          <Volume2 size={14} />
-          {isPlaying ? 'Pause' : 'Listen to Passage'}
-        </button>
+      {/* ── Listening: play passage button ── */}
+      {task.type === 'listening' && task.audioText && (
+        <div className="mb-4">
+          <AudioButton label="Listen to Passage" />
+        </div>
       )}
 
-      {/* MCQ Options */}
+      {/* ── MCQ options ── */}
       {task.options && task.type !== 'speaking' && (
         <div className="grid grid-cols-2 gap-2 mb-4">
-          {task.options.map((opt) => {
+          {task.options.map(opt => {
             let cls = 'border border-border bg-muted/30 hover:bg-muted/60 text-foreground';
             if (submitted) {
-              if (opt === task.correctAnswer) cls = 'border-emerald-500 bg-emerald-500/10 text-emerald-400';
-              else if (opt === selected) cls = 'border-red-500 bg-red-500/10 text-red-400';
-              else cls = 'border-border bg-muted/20 text-muted-foreground opacity-50';
+              if (opt === task.correctAnswer)    cls = 'border-emerald-500 bg-emerald-500/10 text-emerald-400';
+              else if (opt === selected)         cls = 'border-red-500 bg-red-500/10 text-red-400';
+              else                               cls = 'border-border bg-muted/20 text-muted-foreground opacity-50';
             } else if (selected === opt) {
               cls = 'border-primary bg-primary/10 text-primary';
             }
@@ -173,7 +213,7 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
         </div>
       )}
 
-      {/* Fill blank input */}
+      {/* ── Fill-blank (grammar, no options) ── */}
       {!task.options && task.type === 'grammar' && (
         <div className="flex gap-2 mb-4">
           <input
@@ -189,16 +229,13 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
         </div>
       )}
 
-      {/* Speaking controls */}
+      {/* ── Speaking controls ── */}
       {task.type === 'speaking' && !speakingDone && (
         <div className="flex flex-col gap-3 mb-4">
-          <button
-            onClick={handlePlayAudio}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 w-fit"
-            data-testid={`button-listen-prompt-${task.id}`}
-          >
-            <Volume2 size={14} /> Listen to Prompt
-          </button>
+          {/* Listen to prompt */}
+          <AudioButton label="Listen to Prompt" />
+
+          {/* Record / practice button */}
           <button
             onClick={handleStartRecording}
             className={`flex items-center gap-2 px-5 py-3 rounded-full text-sm font-bold transition-all w-fit ${
@@ -207,42 +244,70 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
                 : 'bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25'
             }`}
             data-testid={`button-record-${task.id}`}
+            disabled={isPlaying && !isRecording}
+            title={isPlaying && !isRecording ? 'Wait for the prompt to finish first' : ''}
           >
-            {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
-            {isRecording ? 'Recording... (click to stop)' : 'Practice Speaking'}
+            {isRecording
+              ? <><MicOff size={16} /> Recording… click to stop</>
+              : <><Mic size={16} /> Practice Speaking</>
+            }
           </button>
+
+          {isRecording && (
+            <p className="text-xs text-muted-foreground animate-pulse">
+              🎙 Recording… speak clearly. When done, click "Mark as Done" below.
+            </p>
+          )}
         </div>
       )}
 
-      {/* Feedback */}
+      {/* ── Answer feedback (MCQ / fill-blank) ── */}
       {submitted && (
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl mb-3 ${
-          isCorrect ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-red-500/10 border border-red-500/20'
+        <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl mb-3 ${
+          isCorrect
+            ? 'bg-emerald-500/10 border border-emerald-500/20'
+            : 'bg-red-500/10 border border-red-500/20'
         }`}>
           {isCorrect
-            ? <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
-            : <XCircle size={16} className="text-red-400 flex-shrink-0" />
+            ? <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+            : <XCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
           }
-          <p className="text-sm">
+          <div className="flex-1">
             {isCorrect ? (
-              <span className="text-emerald-400 font-bold">Correct! +{task.xp} XP</span>
+              <p className="text-sm text-emerald-400 font-bold">Correct! +{task.xp} XP</p>
             ) : (
-              <span className="text-red-400">Incorrect. Correct answer: <strong className="text-foreground">{task.correctAnswer}</strong></span>
+              <p className="text-sm text-red-400">
+                Not quite. Correct answer:{' '}
+                <strong className="text-foreground">{task.correctAnswer}</strong>
+              </p>
             )}
-          </p>
+            {isPlaying && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Volume2 size={11} className="text-primary" /> Reading answer aloud…
+              </p>
+            )}
+          </div>
         </div>
       )}
 
+      {/* ── Speaking done feedback ── */}
       {speakingDone && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3 bg-emerald-500/10 border border-emerald-500/20">
-          <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
-          <p className="text-sm text-emerald-400 font-bold">Speaking task completed! +{task.xp} XP</p>
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl mb-3 bg-emerald-500/10 border border-emerald-500/20">
+          <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-emerald-400 font-bold">Speaking task completed! +{task.xp} XP</p>
+            {isPlaying && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Volume2 size={11} className="text-primary" /> Hearing feedback…
+              </p>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* ── Action buttons ── */}
       <div className="flex items-center gap-2">
-        {/* Submit button */}
+        {/* Submit (MCQ / fill-blank) */}
         {!submitted && !speakingDone && task.type !== 'speaking' && (
           <button
             onClick={task.options ? handleSubmitMCQ : handleFillBlankSubmit}
@@ -250,11 +315,11 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             data-testid={`button-submit-${task.id}`}
           >
-            Submit
+            Submit Answer
           </button>
         )}
 
-        {/* Speaking submit */}
+        {/* Speaking: mark done */}
         {task.type === 'speaking' && !speakingDone && (
           <button
             onClick={handleSpeakingSubmit}
@@ -265,7 +330,7 @@ export function TaskCard({ task, completed, onComplete, onUndo }: Props) {
           </button>
         )}
 
-        {/* Undo button */}
+        {/* Undo */}
         {showUndo && (
           <button
             onClick={handleUndo}
