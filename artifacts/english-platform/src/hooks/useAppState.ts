@@ -85,6 +85,15 @@ export function useAppState() {
     });
   }, []);
 
+  // Set minutes to an exact absolute value (used by chronometer)
+  const handleSetMinutes = useCallback((totalMinutes: number) => {
+    setState(prev => {
+      const dayProg = getCurrentDayProgress(prev);
+      if (dayProg.totalMinutes === totalMinutes) return prev; // no change
+      return updateDayProgress(prev, { totalMinutes });
+    });
+  }, []);
+
   const handleNextDay = useCallback(() => {
     setState(prev => {
       if (!canAdvanceToNextLesson(prev)) return prev;
@@ -123,6 +132,7 @@ export function useAppState() {
     handleAddXP,
     handleCompleteTask,
     handleAddMinutes,
+    handleSetMinutes,
     handleNextDay,
     handleUndoLastAnswer,
   };

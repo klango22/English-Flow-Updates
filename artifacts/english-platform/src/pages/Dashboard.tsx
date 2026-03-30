@@ -5,6 +5,7 @@ import { VideoSection } from '@/components/VideoSection';
 import { TaskCard } from '@/components/TaskCard';
 import { VocabCard } from '@/components/VocabCard';
 import { useAppState } from '@/hooks/useAppState';
+import { useChronometer } from '@/hooks/useChronometer';
 import { getLesson } from '@/lib/syllabus';
 import { initVoice } from '@/lib/speechEngine';
 
@@ -19,6 +20,7 @@ export default function Dashboard() {
     handleWeekReset,
     handleCompleteTask,
     handleAddMinutes,
+    handleSetMinutes,
     handleNextDay,
     handleUndoLastAnswer,
   } = useAppState();
@@ -30,12 +32,24 @@ export default function Dashboard() {
     initVoice();
   }, []);
 
-  // Track time spent
-  useEffect(() => {
-    const interval = setInterval(() => {
-      handleAddMinutes(1);
-    }, 60000);
-    return () => clearInterval(interval);
+  // Precision chronometer — single global setInterval, Date.now() delta
+  const onTick = useCallback((totalMinutes: number) => {
+    handleSetMinutes(totalMinutes);
+  }, [handleSetMinutes]);
+
+  const onSave = useCallback((totalMinutes: number) => {
+    handleSetMinutes(totalMinutes);
+  }, [handleSetMinutes]);
+
+  useChronometer({
+    currentMinutes: dayProgress.totalMinutes,
+    onTick,
+    onSave,
+  });
+
+  // Video watch minutes use addMinutes (relative bonus time from watching)
+  const handleVideoWatch = useCallback((minutes: number) => {
+    handleAddMinutes(minutes);
   }, [handleAddMinutes]);
 
   const grammarTasks = lesson.tasks.filter(t => t.type === 'grammar');
@@ -76,15 +90,21 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-4 text-center">
               <div>
-                <p className="text-2xl font-bold text-foreground">{completedTasks.length}<span className="text-base text-muted-foreground">/20</span></p>
+                <p className="text-2xl font-bold text-foreground">
+                  {completedTasks.length}<span className="text-base text-muted-foreground">/20</span>
+                </p>
                 <p className="text-xs text-muted-foreground">Tasks</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{accuracy}<span className="text-base text-muted-foreground">%</span></p>
+                <p className="text-2xl font-bold text-foreground">
+                  {accuracy}<span className="text-base text-muted-foreground">%</span>
+                </p>
                 <p className="text-xs text-muted-foreground">Accuracy</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{minutesDone}<span className="text-base text-muted-foreground">/90</span></p>
+                <p className="text-2xl font-bold text-foreground">
+                  {minutesDone}<span className="text-base text-muted-foreground">/90</span>
+                </p>
                 <p className="text-xs text-muted-foreground">Minutes</p>
               </div>
             </div>
@@ -157,7 +177,7 @@ export default function Dashboard() {
         {activeTab === 'lessons' && (
           <VideoSection
             videos={lesson.videos}
-            onWatchMinutes={handleAddMinutes}
+            onWatchMinutes={handleVideoWatch}
           />
         )}
 
