@@ -42,33 +42,35 @@ export interface VocabCard {
 export const ENGLISHBAY_PLAYLIST_ID = 'PLZ65xj2SRHQB0T2GGk-R7bYxorKUkcyoj';
 export const ENGLISHBAY_PLAYLIST_URL = `https://www.youtube.com/playlist?list=${ENGLISHBAY_PLAYLIST_ID}`;
 
-// EnglishBay playlist — actual videos from PLZ65xj2SRHQB0T2GGk-R7bYxorKUkcyoj
-// Using embed-friendly IDs; "Watch on YouTube" fallback handles blocked embeds
+// ── Real video IDs extracted directly from the EnglishBay playlist ──
+// Playlist: https://www.youtube.com/playlist?list=PLZ65xj2SRHQB0T2GGk-R7bYxorKUkcyoj
+// IDs confirmed by fetching the playlist page (not the playlist ID itself)
 const ENGLISHBAY_VIDEOS: VideoItem[] = [
-  { id: 'eb1', title: 'Advanced English Conversation Practice', youtubeId: 'SHFGlulSRso', duration: '45 min', type: 'englishbay', topic: 'Conversation', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb2', title: 'Complex Grammar for Advanced Learners', youtubeId: 'CJEDBzOK0lA', duration: '40 min', type: 'englishbay', topic: 'Grammar', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb3', title: 'Advanced Listening Comprehension', youtubeId: 'B0K6J8gS9Ts', duration: '35 min', type: 'englishbay', topic: 'Listening', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb4', title: 'Business English Mastery', youtubeId: '4JDM5c_-RB8', duration: '42 min', type: 'englishbay', topic: 'Business', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb5', title: 'Idioms & Phrasal Verbs in Context', youtubeId: 'nWK0-6JrBqk', duration: '38 min', type: 'englishbay', topic: 'Vocabulary', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb6', title: 'Academic Writing & Expression', youtubeId: 'aFCNob5bFhA', duration: '44 min', type: 'englishbay', topic: 'Writing', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb7', title: 'Pronunciation & Natural Intonation', youtubeId: 'Yb0bTVBLXeE', duration: '36 min', type: 'englishbay', topic: 'Pronunciation', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb8', title: 'Advanced Vocabulary in Context', youtubeId: 'l3MZljBhzT4', duration: '41 min', type: 'englishbay', topic: 'Vocabulary', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb9', title: 'English in Real-World Situations', youtubeId: 'GbSdQqkU8MU', duration: '39 min', type: 'englishbay', topic: 'Real Life', playlistId: ENGLISHBAY_PLAYLIST_ID },
-  { id: 'eb10', title: 'Debate & Discussion Techniques', youtubeId: 'dFBBBmU5t1Q', duration: '46 min', type: 'englishbay', topic: 'Speaking', playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb1',  title: 'EnglishBay – Passive Voice in English',           youtubeId: '5oiNmAkmkak', duration: '~30 min', type: 'englishbay', topic: 'Grammar – Passive Voice',    playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb2',  title: 'EnglishBay – Modal Verbs: Must & Have To',        youtubeId: '64cZmvI6Vgc', duration: '~28 min', type: 'englishbay', topic: 'Grammar – Modals',          playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb3',  title: 'EnglishBay – Modal Verbs: Should & Ought To',     youtubeId: 'A2ltxVTt848', duration: '~28 min', type: 'englishbay', topic: 'Grammar – Modals',          playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb4',  title: 'EnglishBay – Simple Past Tense',                  youtubeId: 'dw5bMTE8KLo', duration: '~32 min', type: 'englishbay', topic: 'Grammar – Past Tense',      playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb5',  title: 'EnglishBay – Comparatives & Superlatives',        youtubeId: 'emDuyhYqlXw', duration: '~26 min', type: 'englishbay', topic: 'Grammar – Comparatives',    playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb6',  title: 'EnglishBay – Modal Verbs: Can & Could',           youtubeId: 'FEKwE-Qv3vs', duration: '~30 min', type: 'englishbay', topic: 'Grammar – Modals',          playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb7',  title: 'EnglishBay – Past Continuous Tense',              youtubeId: 'DrYGemNVFE0', duration: '~29 min', type: 'englishbay', topic: 'Grammar – Past Continuous', playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb8',  title: 'EnglishBay – Could / Would in Context',           youtubeId: '_5GZqUvGT4g', duration: '~31 min', type: 'englishbay', topic: 'Grammar – Modals',          playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb9',  title: 'EnglishBay – Conditional Sentences',              youtubeId: '2dm7AWaqlv0', duration: '~33 min', type: 'englishbay', topic: 'Grammar – Conditionals',    playlistId: ENGLISHBAY_PLAYLIST_ID },
+  { id: 'eb10', title: 'EnglishBay – Subjunctive & Expressing Wishes',    youtubeId: '4bL5nYlIWqc', duration: '~27 min', type: 'englishbay', topic: 'Grammar – Subjunctive',     playlistId: ENGLISHBAY_PLAYLIST_ID },
 ];
 
-// Complementary videos — well-known embeddable English learning content
+// ── Complementary videos — TED Talks & known-embeddable educational content ──
+// TED content is reliably embeddable; IDs verified from TED.com
 const COMPLEMENTARY_VIDEOS: VideoItem[] = [
-  { id: 'c1', title: 'How Language Shapes the Way We Think', youtubeId: 'RKK7wGAYP6k', duration: '14 min', type: 'complementary', topic: 'Communication' },
-  { id: 'c2', title: 'English Pronunciation - Advanced', youtubeId: 'n4NVPg2kHv4', duration: '18 min', type: 'complementary', topic: 'Pronunciation' },
-  { id: 'c3', title: '500 English Listening Practice', youtubeId: 'Tj-HNpLfTtk', duration: '20 min', type: 'complementary', topic: 'Listening' },
-  { id: 'c4', title: 'Advanced English Grammar - Perfect Tenses', youtubeId: 'fBdWFeBHZkU', duration: '22 min', type: 'complementary', topic: 'Grammar' },
-  { id: 'c5', title: 'Speak English Like a Native Speaker', youtubeId: 'VcjzHMhBtf0', duration: '19 min', type: 'complementary', topic: 'Speaking' },
-  { id: 'c6', title: 'English Phrasal Verbs in Daily Life', youtubeId: 'QLYYNaelroc', duration: '21 min', type: 'complementary', topic: 'Vocabulary' },
-  { id: 'c7', title: 'IELTS Speaking Full Band 9', youtubeId: '13wFNiKjHII', duration: '23 min', type: 'complementary', topic: 'Speaking' },
-  { id: 'c8', title: 'Advanced English Listening - News', youtubeId: 'pBLRaJKUXgg', duration: '17 min', type: 'complementary', topic: 'Listening' },
-  { id: 'c9', title: 'Business Communication Skills', youtubeId: 'HAnw168huqA', duration: '24 min', type: 'complementary', topic: 'Business' },
-  { id: 'c10', title: 'English Storytelling & Narrative', youtubeId: 'V7I-lWTkixg', duration: '20 min', type: 'complementary', topic: 'Speaking' },
+  { id: 'c1',  title: 'How to Speak So People Want to Listen',         youtubeId: 'eIho2S0ZahI', duration: '11 min', type: 'complementary', topic: 'Communication' },
+  { id: 'c2',  title: 'How Language Shapes the Way We Think',          youtubeId: 'RKK7wGAYP6k', duration: '14 min', type: 'complementary', topic: 'Linguistics' },
+  { id: 'c3',  title: '10 Ways to Have a Better Conversation',         youtubeId: 'R1vskiVDwl4', duration: '12 min', type: 'complementary', topic: 'Speaking' },
+  { id: 'c4',  title: 'The Linguistic Genius of Babies',               youtubeId: 'G2XBIkHW954', duration: '10 min', type: 'complementary', topic: 'Language Acquisition' },
+  { id: 'c5',  title: 'Your Body Language May Shape Who You Are',      youtubeId: 'Ks-_Mh1QhMc', duration: '21 min', type: 'complementary', topic: 'Communication' },
+  { id: 'c6',  title: 'The Power of Vulnerability',                    youtubeId: 'iCvmsMzlF7o', duration: '20 min', type: 'complementary', topic: 'Expression' },
+  { id: 'c7',  title: 'Do Schools Kill Creativity?',                   youtubeId: 'iG9CE55wbtY', duration: '19 min', type: 'complementary', topic: 'Learning' },
+  { id: 'c8',  title: 'The Danger of a Single Story',                  youtubeId: 'D9Ihs241zeg', duration: '19 min', type: 'complementary', topic: 'Storytelling' },
+  { id: 'c9',  title: 'How Great Leaders Inspire Action',              youtubeId: 'qp0HIF3SfI4', duration: '18 min', type: 'complementary', topic: 'Leadership' },
+  { id: 'c10', title: 'Inside the Mind of a Master Procrastinator',    youtubeId: 'arj7oStGLkU', duration: '14 min', type: 'complementary', topic: 'Fluency' },
 ];
 
 const VOCAB_BANKS: VocabCard[][] = [
