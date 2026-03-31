@@ -8,3 +8,45 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface AuthUser {
+  id: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string | null;
+}
+
+export interface GetCurrentAuthUserResponse {
+  user: AuthUser | null;
+}
+
+export interface ExchangeMobileAuthorizationCodeBody {
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  state: string;
+  nonce?: string | null;
+}
+
+export interface ExchangeMobileAuthorizationCodeResponse {
+  token: string;
+}
+
+export interface LogoutMobileSessionResponse {
+  success: boolean;
+}
+
+export interface GetUserProgressResponse {
+  data: unknown | null;
+}
+
+export type SaveUserProgressBodyData = { [key: string]: unknown };
+
+export interface SaveUserProgressBody {
+  data: SaveUserProgressBodyData;
+}
+
+export interface SaveUserProgressResponse {
+  success: boolean;
+}

@@ -14,3 +14,62 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns the current auth state. Returns null user when not authenticated.
+ * @summary Get current authenticated user
+ */
+export const GetCurrentAuthUserResponse = zod.object({
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().nullish(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      profileImageUrl: zod.string().nullish(),
+    }),
+    zod.null(),
+  ]),
+});
+
+/**
+ * @summary Exchange mobile authorization code for session token
+ */
+export const ExchangeMobileAuthorizationCodeBody = zod.object({
+  code: zod.string(),
+  code_verifier: zod.string(),
+  redirect_uri: zod.string(),
+  state: zod.string(),
+  nonce: zod.string().nullish(),
+});
+
+export const ExchangeMobileAuthorizationCodeResponse = zod.object({
+  token: zod.string(),
+});
+
+/**
+ * @summary Logout mobile session
+ */
+export const LogoutMobileSessionResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * Returns the user's AppState blob. Returns null data when no progress saved yet.
+ * @summary Fetch the current user's saved progress
+ */
+export const GetUserProgressResponse = zod.object({
+  data: zod.unknown().nullable(),
+});
+
+/**
+ * Upserts the full AppState blob for the authenticated user.
+ * @summary Save the current user's progress
+ */
+export const SaveUserProgressBody = zod.object({
+  data: zod.object({}).passthrough(),
+});
+
+export const SaveUserProgressResponse = zod.object({
+  success: zod.boolean(),
+});

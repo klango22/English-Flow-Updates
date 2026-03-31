@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useAuth } from '@workspace/replit-auth-web';
 import {
   AppState,
   CalendarSync,
   loadState,
   saveState,
+  getDefaultState,
   masterReset,
   resetCurrentWeek,
   addXP,
@@ -14,60 +16,80 @@ import {
   computeCalendarSync,
 } from '@/lib/store';
 
+export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
+
+// ─── Remote progress helpers ──────────────────────────────────────────────────
+
+async function fetchRemoteProgress(): Promise<AppState | null> {
+  try {
+    const res = await fetch('/api/progress', { credentials: 'include' });
+    if (!res.ok) return null;
+    const { data } = await res.json() as { data: unknown };
+    if (!data || typeof data !== 'object') return null;
+    return { ...getDefaultState(), ...(data as Partial<AppState>) };
+  } catch {
+    return null;
+  }
+}
+
+async function pushRemoteProgress(state: AppState): Promise<boolean> {
+  try {
+    const res = await fetch('/api/progress', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: state }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── useAppState ──────────────────────────────────────────────────────────────
+
 export function useAppState() {
+  // Auth — provided by Replit Auth OIDC
+  const { user, isLoading: authLoading, isAuthenticated, login, logout } = useAuth();
+
   const [state, setState] = useState<AppState>(() => loadState());
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
 
   // Derived: recomputed on every render so it's always current local-time
   const calendarSync: CalendarSync = computeCalendarSync(state);
 
-  // ── First-launch: stamp startDate & sync currentDay/Week to calendar ────────
+  // ── First-launch: stamp startDate, sync currentDay/Week to calendar ──────
 
   useEffect(() => {
     setState(prev => {
       const today = getLocalDateStr();
       const sync  = computeCalendarSync(prev);
-
       let next = { ...prev };
       let changed = false;
 
-      // 1. Record start date if missing
-      if (!next.startDate) {
-        next = { ...next, startDate: today };
-        changed = true;
-      }
+      if (!next.startDate) { next = { ...next, startDate: today }; changed = true; }
 
-      // 2. Update streak & lastPlayDate
       if (!next.lastPlayDate || next.lastPlayDate !== today) {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yStr = getLocalDateStr(yesterday);
-
         const streak = next.lastPlayDate === yStr ? next.streak + 1 : 0;
         next = { ...next, streak, lastPlayDate: today };
         changed = true;
       }
 
-      // 3. Sync currentDay / currentWeek to calendar (if not in catch-up view)
-      if (
-        next.currentDay  !== sync.calendarDay ||
-        next.currentWeek !== sync.calendarWeek
-      ) {
+      if (next.currentDay !== sync.calendarDay || next.currentWeek !== sync.calendarWeek) {
         next = { ...next, currentDay: sync.calendarDay, currentWeek: sync.calendarWeek };
         changed = true;
       }
 
-      if (changed) {
-        saveState(next);
-        return next;
-      }
+      if (changed) { saveState(next); return next; }
       return prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally once on mount
+  }, []);
 
-  // ── Midnight tick — re-sync when local date changes ───────────────────────
-  // Polls every 60s; on a date change it updates the state so the UI
-  // immediately reflects the new calendar day without a page reload.
+  // ── Midnight tick ─────────────────────────────────────────────────────────
 
   const lastDateRef = useRef(getLocalDateStr());
 
@@ -80,10 +102,10 @@ export function useAppState() {
           const sync = computeCalendarSync({ ...prev, lastPlayDate: today });
           const next = {
             ...prev,
-            startDate:    prev.startDate || today,
+            startDate: prev.startDate || today,
             lastPlayDate: today,
-            currentDay:   sync.calendarDay,
-            currentWeek:  sync.calendarWeek,
+            currentDay: sync.calendarDay,
+            currentWeek: sync.calendarWeek,
           };
           saveState(next);
           return next;
@@ -93,10 +115,59 @@ export function useAppState() {
     return () => clearInterval(id);
   }, []);
 
+  // ── Remote sync: fetch on login ───────────────────────────────────────────
+  // When the user logs in, pull their saved progress and hydrate local state.
+  // Remote takes precedence over localStorage so progress is never lost.
+
+  const hasFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || authLoading || hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
+    setSyncStatus('syncing');
+    fetchRemoteProgress().then(remote => {
+      if (remote) {
+        // Merge: keep calendar from today's local timestamp, use remote progress data
+        const today = getLocalDateStr();
+        const sync = computeCalendarSync(remote);
+        const merged: AppState = {
+          ...remote,
+          startDate: remote.startDate || today,
+          lastPlayDate: today,
+          currentDay: sync.calendarDay,
+          currentWeek: sync.calendarWeek,
+        };
+        saveState(merged);
+        setState(merged);
+      }
+      setSyncStatus('saved');
+    });
+  }, [isAuthenticated, authLoading]);
+
+  // ── Remote sync: debounced push on state change ───────────────────────────
+  // Only push when authenticated. 4-second debounce so rapid interactions
+  // (answering exercises quickly) don't hammer the API.
+
+  const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    pushTimerRef.current = setTimeout(() => {
+      setSyncStatus('syncing');
+      pushRemoteProgress(state).then(ok => {
+        setSyncStatus(ok ? 'saved' : 'error');
+      });
+    }, 4_000);
+
+    return () => {
+      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    };
+  }, [state, isAuthenticated]);
+
   // ── View-day switching (catch-up mode) ────────────────────────────────────
-  // When the user is behind, they can navigate to the incomplete day.
-  // We update currentDay/currentWeek in state so the chronometer and
-  // all progress functions automatically track the right day.
 
   const handleViewDay = useCallback((day: number, week: number) => {
     setState(prev => {
@@ -123,10 +194,6 @@ export function useAppState() {
     setState(prev => resetCurrentWeek(prev));
   }, []);
 
-  const handleAddXP = useCallback((amount: number) => {
-    setState(prev => addXP(prev, amount));
-  }, []);
-
   const handleCompleteTask = useCallback((taskId: string, xp: number, correct: boolean) => {
     setState(prev => {
       const dayProg = getCurrentDayProgress(prev);
@@ -151,7 +218,6 @@ export function useAppState() {
     });
   }, []);
 
-  // Exact absolute value — used by chronometer for drift-free tracking
   const handleSetMinutes = useCallback((totalMinutes: number) => {
     setState(prev => {
       const dayProg = getCurrentDayProgress(prev);
@@ -161,7 +227,6 @@ export function useAppState() {
   }, []);
 
   const handleNextDay = useCallback(() => {
-    // "Next Lesson" just returns to today — the calendar drives the day
     handleReturnToToday();
   }, [handleReturnToToday]);
 
@@ -173,10 +238,9 @@ export function useAppState() {
     });
   }, []);
 
-  const dayProgress    = getCurrentDayProgress(state);
+  const dayProgress      = getCurrentDayProgress(state);
   const lessonUnlockable = canAdvanceToNextLesson(state);
 
-  // Is the user currently viewing a catch-up day (not today)?
   const isViewingCatchUpDay =
     state.currentDay  !== calendarSync.calendarDay ||
     state.currentWeek !== calendarSync.calendarWeek;
@@ -187,9 +251,16 @@ export function useAppState() {
     calendarSync,
     lessonUnlockable,
     isViewingCatchUpDay,
+    // Auth
+    user,
+    authLoading,
+    isAuthenticated,
+    login,
+    logout,
+    syncStatus,
+    // Handlers
     handleMasterReset,
     handleWeekReset,
-    handleAddXP,
     handleCompleteTask,
     handleAddMinutes,
     handleSetMinutes,

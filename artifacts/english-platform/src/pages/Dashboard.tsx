@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, MessageSquare, Headphones, Layers, AlertTriangle, ArrowLeft, CalendarCheck } from 'lucide-react';
+import { BookOpen, MessageSquare, Headphones, Layers, AlertTriangle, ArrowLeft, CalendarCheck, CloudOff } from 'lucide-react';
 import { ProgressHeader } from '@/components/ProgressHeader';
 import { VideoSection } from '@/components/VideoSection';
 import { TaskCard } from '@/components/TaskCard';
@@ -11,7 +11,44 @@ import { initVoice } from '@/lib/speechEngine';
 
 type Tab = 'lessons' | 'grammar' | 'listening' | 'speaking' | 'vocabulary';
 
-// ─── Behind-warning banner ────────────────────────────────────────────────────
+// ─── Guest banner ─────────────────────────────────────────────────────────────
+
+function GuestBanner({ onLogin }: { onLogin: () => void }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  return (
+    <div className="bg-primary/10 border-b border-primary/25">
+      <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <CloudOff size={15} className="text-primary shrink-0" />
+          <p className="text-xs text-foreground">
+            <span className="font-semibold">Progress not saved.</span>
+            {' '}Log in to sync your XP, streak, and exercises across devices — it only takes a second.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onLogin}
+            className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity"
+            data-testid="btn-guest-login"
+          >
+            Log in to save progress
+          </button>
+          <button
+            onClick={() => setDismissed(true)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Behind / catch-up banner ─────────────────────────────────────────────────
 
 interface BehindBannerProps {
   behindDay: number;
@@ -79,6 +116,12 @@ export default function Dashboard() {
     dayProgress,
     calendarSync,
     isViewingCatchUpDay,
+    user,
+    authLoading,
+    isAuthenticated,
+    login,
+    logout,
+    syncStatus,
     handleMasterReset,
     handleWeekReset,
     handleCompleteTask,
@@ -92,16 +135,12 @@ export default function Dashboard() {
 
   const lesson = getLesson(state.currentWeek, state.currentDay);
 
-  // Initialize TTS voice on mount
   useEffect(() => { initVoice(); }, []);
 
-  // Precision chronometer — single global setInterval, Date.now() delta
   const onTick = useCallback((m: number) => handleSetMinutes(m), [handleSetMinutes]);
   const onSave = useCallback((m: number) => handleSetMinutes(m), [handleSetMinutes]);
-
   useChronometer({ currentMinutes: dayProgress.totalMinutes, onTick, onSave });
 
-  // Video watch time uses addMinutes (extra credit on top of chronometer)
   const handleVideoWatch = useCallback((m: number) => handleAddMinutes(m), [handleAddMinutes]);
 
   const grammarTasks   = lesson.tasks.filter(t => t.type === 'grammar');
@@ -120,7 +159,6 @@ export default function Dashboard() {
   const minutesDone    = dayProgress.totalMinutes;
   const completedTasks = dayProgress.completedTasks;
 
-  // Calendar display labels — always show the true calendar day in the banner
   const bannerWeek = isViewingCatchUpDay ? state.currentWeek : calendarSync.calendarWeek;
   const bannerDay  = isViewingCatchUpDay ? state.currentDay  : calendarSync.calendarDay;
 
@@ -136,10 +174,21 @@ export default function Dashboard() {
         state={state}
         calendarSync={calendarSync}
         isViewingCatchUpDay={isViewingCatchUpDay}
+        user={user}
+        authLoading={authLoading}
+        isAuthenticated={isAuthenticated}
+        syncStatus={syncStatus}
         onMasterReset={handleMasterReset}
         onWeekReset={handleWeekReset}
         onNextDay={handleNextDay}
+        onLogin={login}
+        onLogout={logout}
       />
+
+      {/* Guest: not authenticated, not loading */}
+      {!authLoading && !isAuthenticated && (
+        <GuestBanner onLogin={login} />
+      )}
 
       {/* Behind / catch-up banner */}
       {(calendarSync.isBehind || isViewingCatchUpDay) && (
@@ -189,21 +238,17 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Progress bars */}
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
               <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>Time Progress</span>
-                <span>{minutesDone}/90 min</span>
+                <span>Time Progress</span><span>{minutesDone}/90 min</span>
               </div>
               <div className="progress-bar">
                 <div
                   className="progress-bar-fill"
                   style={{
                     width: `${Math.min(100, (minutesDone / 90) * 100)}%`,
-                    background: isViewingCatchUpDay
-                      ? 'linear-gradient(90deg, hsl(38 92% 50%), hsl(38 92% 65%))'
-                      : undefined,
+                    background: isViewingCatchUpDay ? 'linear-gradient(90deg, hsl(38 92% 50%), hsl(38 92% 65%))' : undefined,
                   }}
                 />
               </div>
@@ -247,9 +292,7 @@ export default function Dashboard() {
                 {tab.icon}
                 {tab.label}
                 {tab.count !== undefined && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    activeTab === tab.id ? 'bg-white/20' : 'bg-muted'
-                  }`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-white/20' : 'bg-muted'}`}>
                     {tab.count}
                   </span>
                 )}
@@ -264,69 +307,48 @@ export default function Dashboard() {
         {activeTab === 'lessons' && (
           <VideoSection videos={lesson.videos} onWatchMinutes={handleVideoWatch} />
         )}
-
         {activeTab === 'grammar' && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-foreground">Grammar Tasks</h2>
             <p className="text-sm text-muted-foreground">Complete all grammar exercises to strengthen your understanding.</p>
             <div className="space-y-4">
               {grammarTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  completed={completedTasks.includes(task.id)}
-                  onComplete={handleCompleteTask}
-                  onUndo={handleUndoLastAnswer}
-                />
+                <TaskCard key={task.id} task={task} completed={completedTasks.includes(task.id)}
+                  onComplete={handleCompleteTask} onUndo={handleUndoLastAnswer} />
               ))}
             </div>
           </div>
         )}
-
         {activeTab === 'listening' && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-foreground">Listening Tasks</h2>
             <p className="text-sm text-muted-foreground">Listen to each passage and answer the comprehension questions.</p>
             <div className="space-y-4">
               {listeningTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  completed={completedTasks.includes(task.id)}
-                  onComplete={handleCompleteTask}
-                  onUndo={handleUndoLastAnswer}
-                />
+                <TaskCard key={task.id} task={task} completed={completedTasks.includes(task.id)}
+                  onComplete={handleCompleteTask} onUndo={handleUndoLastAnswer} />
               ))}
             </div>
           </div>
         )}
-
         {activeTab === 'speaking' && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-foreground">Speaking Tasks</h2>
             <p className="text-sm text-muted-foreground">Practice your spoken English. Each task plays the prompt for you.</p>
             <div className="space-y-4">
               {speakingTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  completed={completedTasks.includes(task.id)}
-                  onComplete={handleCompleteTask}
-                  onUndo={handleUndoLastAnswer}
-                />
+                <TaskCard key={task.id} task={task} completed={completedTasks.includes(task.id)}
+                  onComplete={handleCompleteTask} onUndo={handleUndoLastAnswer} />
               ))}
             </div>
           </div>
         )}
-
         {activeTab === 'vocabulary' && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-foreground">Vocabulary Cards</h2>
             <p className="text-sm text-muted-foreground">Tap any card to flip and reveal the definition. Use the speaker to hear pronunciation.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {lesson.vocabulary.map(card => (
-                <VocabCard key={card.id} card={card} />
-              ))}
+              {lesson.vocabulary.map(card => <VocabCard key={card.id} card={card} />)}
             </div>
           </div>
         )}
