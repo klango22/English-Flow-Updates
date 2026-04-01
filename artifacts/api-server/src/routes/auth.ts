@@ -34,7 +34,7 @@ function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    sameSite: "none",
     path: "/",
     maxAge: SESSION_TTL,
   });
@@ -51,7 +51,11 @@ function setOidcCookie(res: Response, name: string, value: string) {
 }
 
 function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+  if (
+    typeof value !== "string" ||
+    !value.startsWith("/") ||
+    value.startsWith("//")
+  ) {
     return "/";
   }
   return value;
@@ -106,7 +110,7 @@ router.get("/login", async (req: Request, res: Response) => {
     scope: "openid email profile offline_access",
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
-    prompt: "login consent",
+    prompt: "consent",
     state,
     nonce,
   });
@@ -164,9 +168,7 @@ router.get("/callback", async (req: Request, res: Response) => {
     return;
   }
 
-  const dbUser = await upsertUser(
-    claims as unknown as Record<string, unknown>,
-  );
+  const dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
 
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {

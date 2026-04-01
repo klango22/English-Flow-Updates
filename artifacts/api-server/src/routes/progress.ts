@@ -9,13 +9,11 @@ router.get("/progress", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-
   try {
     const [row] = await db
       .select()
       .from(userProgressTable)
       .where(eq(userProgressTable.userId, req.user.id));
-
     res.json({ data: row?.data ?? null });
   } catch (err) {
     req.log.error({ err }, "Failed to fetch user progress");
@@ -30,8 +28,17 @@ router.put("/progress", async (req: Request, res: Response) => {
   }
 
   const { data } = req.body as { data: unknown };
-  if (!data || typeof data !== "object") {
+
+  if (data !== null && typeof data !== "object") {
     res.status(400).json({ error: "Missing or invalid data" });
+    return;
+  }
+
+  if (data === null) {
+    await db
+      .delete(userProgressTable)
+      .where(eq(userProgressTable.userId, req.user.id));
+    res.json({ success: true });
     return;
   }
 
@@ -46,7 +53,6 @@ router.put("/progress", async (req: Request, res: Response) => {
           updatedAt: new Date(),
         },
       });
-
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "Failed to save user progress");

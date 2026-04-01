@@ -20,20 +20,24 @@ let _voicesLoaded = false;
  * and avoids known robotic voices like Microsoft Zira.
  */
 const PRIORITY_FILTERS: ((v: SpeechSynthesisVoice) => boolean)[] = [
-  v => v.name === 'Google US English',
-  v => /Microsoft Aria/i.test(v.name),
-  v => /Microsoft Jenny/i.test(v.name),
-  v => /Microsoft Guy/i.test(v.name),
-  v => /Natural/i.test(v.name) && v.lang.startsWith('en'),
-  v => /Neural/i.test(v.name) && v.lang.startsWith('en'),
-  v => v.name.includes('Google') && v.lang === 'en-US',
-  v => v.name.includes('Microsoft') && v.lang === 'en-US' && !/Zira/i.test(v.name),
-  v => v.lang === 'en-US' && !/Zira/i.test(v.name),
-  v => v.lang.startsWith('en-US'),
-  v => v.lang.startsWith('en'),
+  (v) => v.name === "Google US English",
+  (v) => /Microsoft Aria Online \(Natural\)/i.test(v.name),
+  (v) => /Microsoft Aria/i.test(v.name),
+  (v) => /Microsoft Jenny/i.test(v.name),
+  (v) => /Microsoft Guy/i.test(v.name),
+  (v) => /Natural/i.test(v.name) && v.lang.startsWith("en"),
+  (v) => /Neural/i.test(v.name) && v.lang.startsWith("en"),
+  (v) => v.name.includes("Google") && v.lang === "en-US",
+  (v) =>
+    v.name.includes("Microsoft") && v.lang === "en-US" && !/Zira/i.test(v.name),
+  (v) => v.lang === "en-US" && !/Zira/i.test(v.name),
+  (v) => v.lang.startsWith("en-US"),
+  (v) => v.lang.startsWith("en"),
 ];
 
-function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+function pickBestVoice(
+  voices: SpeechSynthesisVoice[],
+): SpeechSynthesisVoice | null {
   for (const filter of PRIORITY_FILTERS) {
     const match = voices.find(filter);
     if (match) return match;
@@ -101,7 +105,7 @@ export function initVoice(): Promise<SpeechSynthesisVoice | null> {
 
 /** Returns the name of the currently selected voice, for display/debug. */
 export function getVoiceName(): string {
-  return _selectedVoice?.name ?? 'Browser Default';
+  return _selectedVoice?.name ?? "Browser Default";
 }
 
 // ─── Chrome long-utterance fix ───────────────────────────────────────────────
@@ -123,7 +127,10 @@ function makeKeepAlive(): { start: () => void; stop: () => void } {
       }, 10_000);
     },
     stop() {
-      if (id) { clearInterval(id); id = null; }
+      if (id) {
+        clearInterval(id);
+        id = null;
+      }
     },
   };
 }
@@ -143,13 +150,16 @@ export function speak(text: string, options: SpeechOptions = {}): void {
   const doSpeak = (voice: SpeechSynthesisVoice | null) => {
     const utterance = new SpeechSynthesisUtterance(text);
 
-    utterance.lang   = 'en-US';
-    utterance.pitch  = options.pitch  ?? 1.0;
-    utterance.rate   = options.rate   ?? 0.88;   // slightly slower = clearer
+    utterance.lang = "en-US";
+    utterance.pitch = options.pitch ?? 1.0;
+    utterance.rate = options.rate ?? 0.9; // natural, human-like pace
     utterance.volume = options.volume ?? 1.0;
 
     // Use the best loaded voice; fall back to live getVoices() pick
-    const v = voice ?? _selectedVoice ?? pickBestVoice(window.speechSynthesis.getVoices());
+    const v =
+      voice ??
+      _selectedVoice ??
+      pickBestVoice(window.speechSynthesis.getVoices());
     if (v) utterance.voice = v;
 
     const ka = makeKeepAlive();
@@ -166,7 +176,7 @@ export function speak(text: string, options: SpeechOptions = {}): void {
     utterance.onerror = (ev) => {
       ka.stop();
       // 'interrupted' is fired when we cancel intentionally — not a real error
-      if (ev.error !== 'interrupted') {
+      if (ev.error !== "interrupted") {
         options.onError?.();
       } else {
         options.onEnd?.();
@@ -196,15 +206,16 @@ export function isSpeaking(): boolean {
 // ─── Feedback TTS (speaking module) ─────────────────────────────────────────
 
 const FEEDBACK_PHRASES = [
-  'Well done! Your response sounded clear and confident.',
-  'Great effort! Your pronunciation was very good.',
-  'Excellent work! Keep practicing to build even more fluency.',
-  'Nice job! Your intonation sounded natural.',
-  'Good response! You are making real progress.',
+  "Well done! Your response sounded clear and confident.",
+  "Great effort! Your pronunciation was very good.",
+  "Excellent work! Keep practicing to build even more fluency.",
+  "Nice job! Your intonation sounded natural.",
+  "Good response! You are making real progress.",
 ];
 
 /** Reads back a short positive feedback phrase after a speaking task. */
 export function speakFeedback(): void {
-  const phrase = FEEDBACK_PHRASES[Math.floor(Math.random() * FEEDBACK_PHRASES.length)];
+  const phrase =
+    FEEDBACK_PHRASES[Math.floor(Math.random() * FEEDBACK_PHRASES.length)];
   speak(phrase, { rate: 0.88, pitch: 1.05 });
 }
