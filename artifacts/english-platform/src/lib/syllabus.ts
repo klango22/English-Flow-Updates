@@ -13,7 +13,7 @@ export interface VideoItem {
 export interface Task {
   id: string;
   type: "grammar" | "listening" | "speaking";
-  difficulty: "medium" | "hard" | "advanced";
+  difficulty: 'easy' | 'medium' | 'hard' | 'advanced';
   instruction: string;
   content: string;
   options?: string[];
@@ -986,7 +986,7 @@ function generateGrammarTasks(day: number): Task[] {
   return items.map((item, i) => ({
     id: `grammar_${day}_${i}`,
     type: "grammar" as const,
-    difficulty: i < 3 ? "medium" : i < 7 ? "hard" : "advanced",
+    difficulty: i < 2 ? 'easy' : i < 5 ? 'medium' : i < 8 ? 'hard' : 'advanced',
     instruction: `Choose the correct form. Topic: ${topic}`,
     content: item.sentence,
     options: item.options,
@@ -1001,7 +1001,7 @@ function generateListeningTasks(day: number): Task[] {
   return passage.questions.map((q, i) => ({
     id: `listening_${day}_${i}`,
     type: "listening" as const,
-    difficulty: i < 2 ? "medium" : i < 4 ? "hard" : "advanced",
+    difficulty: i < 2 ? 'easy' : i < 4 ? 'medium' : i < 5 ? 'hard' : 'advanced',
     instruction:
       "Listen to the passage carefully, then select the correct answer.",
     content: q.q,

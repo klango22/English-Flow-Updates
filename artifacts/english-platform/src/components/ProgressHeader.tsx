@@ -1,4 +1,5 @@
-import { Flame, Star, Zap, RotateCcw, Trash2, ChevronRight, CalendarDays, LogIn, LogOut, User } from 'lucide-react';
+import { Flame, Star, Zap, RotateCcw, Trash2, ChevronRight, CalendarDays, LogIn, LogOut, User, TrendingUp } from 'lucide-react';
+import { getLevelBadge, getProgressToNextLevel } from '@/lib/adaptiveEngine';
 import { useState } from 'react';
 import { AppState, getCurrentDayProgress, canAdvanceToNextLesson } from '@/lib/store';
 import type { CalendarSync } from '@/lib/store';
@@ -67,11 +68,24 @@ export function ProgressHeader({
           <span className="text-xs text-muted-foreground hidden sm:inline">streak</span>
         </div>
 
-        {/* Total XP */}
+        {/* Total XP + Level */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
           <Star size={14} className="text-primary" />
           <span className="text-sm font-bold text-primary">{state.totalXP.toLocaleString()}</span>
           <span className="text-xs text-muted-foreground hidden sm:inline">XP</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20">
+          <TrendingUp size={14} className="text-violet-400" />
+          <span className="text-xs font-bold text-violet-400">{getLevelBadge(state.totalXP)}</span>
+          <div className="hidden sm:flex items-center gap-1">
+            <div className="w-16 h-1.5 rounded-full bg-violet-500/20">
+              <div
+                className="h-full rounded-full bg-violet-400 transition-all"
+                style={{ width: `${getProgressToNextLevel(state.totalXP)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground">{getProgressToNextLevel(state.totalXP)}%</span>
+          </div>
         </div>
 
         {/* Daily progress bar */}
