@@ -26,24 +26,15 @@ export function useAuth(): AuthState {
   const [isLoading, setIsLoading] = useState(true);
   const checkedRef = useRef(false);
 
-  // Verificação inicial — roda UMA vez só
   useEffect(() => {
     if (checkedRef.current) return;
     checkedRef.current = true;
-
     fetchUser().then((u) => {
       setUser(u);
       setIsLoading(false);
     });
   }, []);
 
-  const login = useCallback(() => {
-    // Salva a URL atual para detectar retorno do login
-    sessionStorage.setItem("auth_pending", "1");
-    window.location.href = "/api/login?returnTo=/";
-  }, []);
-
-  // Detecta retorno após login (redirect normal)
   useEffect(() => {
     if (sessionStorage.getItem("auth_pending") === "1") {
       sessionStorage.removeItem("auth_pending");
@@ -55,15 +46,14 @@ export function useAuth(): AuthState {
     }
   }, []);
 
+  const login = useCallback(() => {
+    sessionStorage.setItem("auth_pending", "1");
+    window.location.href = "/api/login?returnTo=/";
+  }, []);
+
   const logout = useCallback(() => {
     window.location.href = "/api/logout";
   }, []);
 
-  return {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    logout,
-  };
+  return { user, isLoading, isAuthenticated: !!user, login, logout };
 }
